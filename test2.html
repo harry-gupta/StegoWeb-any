@@ -1,0 +1,1645 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>StegoWeb — Hide Secrets Inside Images</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🕵️</text></svg>" />
+<style>
+  :root{
+    --bg:#0b0e14; --panel:#121826; --panel-2:#0f1421;
+    --border:#232c3f; --border-2:#2f3a52;
+    --text:#e6edf3; --muted:#8b97a8;
+    --accent:#4f8cff; --accent-2:#22d3ee;
+    --ok:#3fb950; --warn:#d29922; --err:#f85149;
+    --radius:14px; --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{min-height:100%}
+  body{
+    background:
+      radial-gradient(900px 500px at 10% -10%, rgba(79,140,255,.13), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, rgba(34,211,238,.10), transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font:15px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 20px 60px}
+  header.top{
+    position:sticky;top:0;z-index:50;backdrop-filter:blur(12px);
+    background:rgba(11,14,20,.78);border-bottom:1px solid var(--border);
+  }
+  .top-inner{max-width:1120px;margin:0 auto;padding:14px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px}
+  .brand .logo{
+    width:32px;height:32px;border-radius:9px;display:grid;place-items:center;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));font-size:17px;
+  }
+  .brand small{display:block;font-weight:500;font-size:11px;color:var(--muted)}
+  nav.tabs{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+  nav.tabs button{
+    background:transparent;border:1px solid transparent;color:var(--muted);
+    padding:8px 15px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;
+  }
+  nav.tabs button:hover{color:var(--text);background:rgba(255,255,255,.04)}
+  nav.tabs button.active{color:var(--text);background:var(--panel);border-color:var(--border-2)}
+  .hero{padding:40px 0 24px;text-align:center}
+  .hero h1{font-size:clamp(24px,4vw,38px);line-height:1.15;font-weight:800;letter-spacing:-.5px}
+  .hero h1 span{background:linear-gradient(90deg,var(--accent),var(--accent-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{color:var(--muted);max-width:640px;margin:12px auto 0}
+  .badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:16px}
+  .badge{font-size:12px;font-weight:600;color:var(--muted);border:1px solid var(--border);background:var(--panel-2);padding:5px 11px;border-radius:999px}
+  .tab-panel{display:none}
+  .tab-panel.active{display:block}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+  @media(max-width:860px){.grid{grid-template-columns:1fr}}
+
+  .encode-layout{
+    display:grid;
+    grid-template-columns:1.6fr 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media(max-width:960px){
+    .encode-layout{grid-template-columns:1fr}
+  }
+
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow)}
+  .card + .card{margin-top:20px}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .card h2 .num{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;background:rgba(79,140,255,.16);color:var(--accent);font-size:11px}
+  .card h3{font-size:13px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);font-weight:700;margin:18px 0 10px}
+  .dropzone{border:1.5px dashed var(--border-2);border-radius:12px;padding:30px 18px;text-align:center;cursor:pointer;transition:.18s;background:rgba(255,255,255,.012)}
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:rgba(79,140,255,.07)}
+  .dropzone p{font-size:14px;color:var(--muted);margin-top:10px}
+  .dropzone p strong{color:var(--text)}
+  .dropzone .hint{margin-top:4px;font-size:12px}
+  .dz-icon{font-size:30px;line-height:1}
+  .preview{margin-top:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  .preview img{width:96px;height:96px;object-fit:cover;border-radius:10px;border:1px solid var(--border-2);background:#000;display:block}
+  .meta{font-size:13px;color:var(--muted);flex:1;min-width:150px}
+  .meta b{color:var(--text);display:block;font-size:14px;word-break:break-all}
+  textarea,input[type=password],input[type=text]{
+    width:100%;background:#0a0e17;border:1px solid var(--border-2);color:var(--text);
+    border-radius:11px;padding:12px 14px;font:inherit;font-size:14px;resize:vertical;outline:none;
+  }
+  textarea:focus,input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,140,255,.15)}
+  textarea{min-height:120px;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .field{position:relative;display:flex;align-items:center}
+  .field .eye{position:absolute;right:8px;background:transparent;border:0;color:var(--muted);cursor:pointer;font-size:15px;padding:6px;border-radius:8px}
+  .field .eye:hover{color:var(--text);background:rgba(255,255,255,.06)}
+  .segmented{display:flex;gap:4px;background:#0a0e17;border:1px solid var(--border-2);border-radius:11px;padding:4px;margin-bottom:12px}
+  .segmented .seg{flex:1;background:transparent;border:0;color:var(--muted);padding:8px;border-radius:8px;cursor:pointer;font:inherit;font-weight:600;font-size:13.5px}
+  .segmented .seg.active{background:var(--accent);color:#fff}
+  .filepick{display:block;border:1.5px dashed var(--border-2);border-radius:11px;padding:20px;text-align:center;cursor:pointer;color:var(--muted);font-size:14px;word-break:break-all}
+  .filepick:hover{border-color:var(--accent);color:var(--text);background:rgba(79,140,255,.06)}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    border:1px solid var(--border-2);background:var(--panel);color:var(--text);
+    padding:11px 18px;border-radius:11px;font:inherit;font-weight:600;font-size:14px;
+    cursor:pointer;text-decoration:none;
+    white-space:normal;
+    text-align:center;
+    line-height:1.35;
+    word-break:break-word;
+    height:auto;
+    min-height:42px;
+  }
+  .btn:hover:not(:disabled){border-color:var(--accent);background:rgba(79,140,255,.10)}
+  .btn:disabled{opacity:.42;cursor:not-allowed}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),#3b6fe0);border-color:transparent;color:#fff;box-shadow:0 6px 18px rgba(79,140,255,.28)}
+  .btn.primary:hover:not(:disabled){filter:brightness(1.08)}
+  .btn.ghost{background:transparent}
+  .btn.danger{border-color:rgba(248,81,73,.4);color:#ff9492;background:rgba(248,81,73,.06)}
+  .btn.danger:hover:not(:disabled){border-color:var(--err);background:rgba(248,81,73,.15);color:#ffb3b1}
+  .btn.small{padding:7px 12px;font-size:12.5px;line-height:1.3;min-height:34px}
+  .btn.block{width:100%;margin-top:16px}
+  .capacity{margin-top:18px}
+  .cap-bar{height:8px;background:#0a0e17;border:1px solid var(--border-2);border-radius:99px;overflow:hidden}
+  .cap-fill{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent-2));transition:width .3s}
+  .cap-fill.warn{background:linear-gradient(90deg,var(--warn),#e3b341)}
+  .cap-fill.over{background:linear-gradient(90deg,var(--err),#ff7b72)}
+  .cap-text{font-size:12.5px;color:var(--muted);margin-top:7px}
+  .status{margin-top:12px;font-size:13.5px;border-radius:10px;padding:0}
+  .status.show{padding:11px 14px}
+  .status.ok{background:rgba(63,185,80,.10);border:1px solid rgba(63,185,80,.35);color:#7ee787}
+  .status.err{background:rgba(248,81,73,.10);border:1px solid rgba(248,81,73,.35);color:#ff9492}
+  .status.info{background:rgba(79,140,255,.10);border:1px solid rgba(79,140,255,.35);color:#a5c8ff}
+  .result-grid{display:grid;grid-template-columns:200px 1fr;gap:20px;align-items:start}
+  @media(max-width:620px){.result-grid{grid-template-columns:1fr}}
+  .result-grid img{width:100%;border-radius:12px;border:1px solid var(--border-2);background:#000}
+  .result-grid .actions{display:flex;flex-direction:column;gap:10px;align-items:flex-start;width:100%}
+  .ok-text{color:#7ee787;font-weight:600;font-size:14px}
+  .chunk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px;margin-top:12px}
+  .chunk-grid .chunk{position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--border-2);background:#000;aspect-ratio:1}
+  .chunk-grid img{width:100%;height:100%;object-fit:cover;display:block}
+  .chunk-grid .label{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.7);color:#fff;font-size:11px;text-align:center;padding:3px 0;font-weight:600}
+
+  /* Fixed geometry for the extracted-content box */
+  .out-box{
+    background:#0a0e17;
+    border:1px solid var(--border-2);
+    border-radius:11px;
+    padding:14px;
+    font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:13.5px;
+    white-space:pre-wrap;
+    word-break:break-word;
+    height:320px;
+    min-height:320px;
+    max-height:320px;
+    overflow:auto;
+    color:#cfe3ff;
+  }
+  .result-actions{
+    display:flex;
+    gap:10px;
+    margin-top:12px;
+    flex-wrap:wrap;
+    align-items:flex-start;
+    min-height:34px;
+  }
+
+  .file-list{list-style:none;padding:0;margin-top:12px;display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto}
+  .file-list li{background:#0a0e17;border:1px solid var(--border-2);border-radius:9px;padding:6px 8px 6px 12px;font-size:13px;display:flex;align-items:center;gap:8px}
+  .file-list .fname{color:var(--text);word-break:break-all;flex:1}
+  .file-list .fsize{color:var(--muted);white-space:nowrap;font-size:12px}
+  .chunk-del{
+    background:transparent;border:1px solid rgba(248,81,73,.3);color:#ff9492;
+    border-radius:6px;width:24px;height:24px;cursor:pointer;font-size:11px;
+    display:grid;place-items:center;flex-shrink:0;line-height:1;padding:0;
+    transition:.15s;
+  }
+  .chunk-del:hover{background:rgba(248,81,73,.18);border-color:var(--err);color:#ffb3b1}
+  .hidden{display:none !important}
+  .note{border-left:3px solid var(--warn);background:rgba(210,153,34,.08);padding:11px 14px;border-radius:0 10px 10px 0;font-size:13.5px;color:#e3b341;margin-top:14px}
+  .hint{font-size:12.5px;color:var(--muted);margin-top:8px}
+  .hint.match-ok{color:var(--ok);font-weight:600}
+  .hint.match-err{color:var(--err);font-weight:600}
+  footer{margin-top:50px;padding-top:26px;border-top:1px solid var(--border);text-align:center;color:var(--muted);font-size:13px}
+  .guide{max-width:820px;margin:0 auto}
+  .guide .card{margin-bottom:18px}
+  .guide p,.guide li{color:var(--muted);margin-bottom:8px}
+  .guide strong{color:var(--text)}
+  .guide code{background:#0a0e17;border:1px solid var(--border-2);border-radius:6px;padding:2px 6px;font-size:12.5px;color:#a5c8ff;font-family:ui-monospace,Menlo,monospace}
+  .guide ol{padding-left:22px}
+  .toolbar-center{display:flex;justify-content:center;align-items:center;margin-top:24px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <div class="logo">🕵️</div>
+      <div>StegoWeb<small>client-side steganography</small></div>
+    </div>
+    <nav class="tabs">
+      <button class="active" data-tab="encode" type="button">Encode</button>
+      <button data-tab="decode" type="button">Decode</button>
+      <button data-tab="guide" type="button">How it works</button>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <h1>Hide secrets <span>inside images</span></h1>
+    <p>Embed an encrypted message or any file into image pixels. Oversized payloads are auto-split across multiple PNGs and delivered as a single ZIP.</p>
+    <div class="badges">
+      <span class="badge">● 100% client-side</span>
+      <span class="badge">AES-256-GCM</span>
+      <span class="badge">Auto-split</span>
+      <span class="badge">Any image · any file</span>
+    </div>
+  </div>
+
+  <!-- ============ ENCODE ============ -->
+  <section class="tab-panel active" id="panel-encode">
+    <div class="encode-layout">
+
+      <div class="encode-left">
+        <div class="card">
+          <h2><span class="num">1</span> Cover image</h2>
+          <div class="dropzone" id="coverDrop">
+            <div class="dz-icon">🖼️</div>
+            <p><strong>Drop any image</strong> or click to browse</p>
+            <p class="hint">PNG · JPG · GIF · BMP · WebP · SVG · AVIF</p>
+          </div>
+          <input type="file" id="coverInput" accept="image/*" hidden />
+          <div class="preview hidden" id="coverPreviewWrap">
+            <img id="coverPreview" alt="Cover preview" />
+            <div class="meta" id="coverMeta"></div>
+            <button class="btn ghost small" id="clearCover" type="button">Remove</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2><span class="num">2</span> Secret payload</h2>
+          <div class="segmented" id="modeSwitch">
+            <button class="seg active" data-mode="text" type="button">Text message</button>
+            <button class="seg" data-mode="file" type="button">Any file</button>
+          </div>
+          <div id="textMode">
+            <textarea id="secretText" placeholder="Type the message you want to hide…" spellcheck="false"></textarea>
+          </div>
+          <div id="fileMode" class="hidden">
+            <label class="filepick" for="secretFile">
+              <span id="secretFileName">📎 Choose any file to hide…</span>
+            </label>
+            <input type="file" id="secretFile" hidden />
+            <p class="hint">Any size. Oversized payloads split automatically across multiple PNGs.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="encode-right">
+        <div class="card">
+          <h2><span class="num">3</span> Encryption</h2>
+
+          <div class="field">
+            <input type="password" id="encodePassword" placeholder="Password (leave blank to skip) — press Enter to hide" autocomplete="new-password" />
+            <button class="eye" id="toggleEncodePw" type="button" title="Show/hide">👁</button>
+          </div>
+
+          <div class="field hidden" id="encodePasswordConfirmWrap" style="margin-top:10px">
+            <input type="password" id="encodePasswordConfirm" placeholder="Re-enter password to confirm — press Enter to hide" autocomplete="new-password" />
+            <button class="eye" id="toggleEncodePwConfirm" type="button" title="Show/hide">👁</button>
+          </div>
+
+          <p class="hint" id="encodePasswordMatchHint"></p>
+          <p class="hint">AES-256-GCM · PBKDF2 200,000 iterations · SHA-256. Password never leaves your device.</p>
+
+          <div class="capacity">
+            <div class="cap-bar"><div class="cap-fill" id="capFill"></div></div>
+            <div class="cap-text" id="capText">Select a cover image to see capacity.</div>
+          </div>
+
+          <button class="btn primary block" id="encodeBtn" disabled type="button">🔒 Hide &amp; generate</button>
+          <div class="status" id="encodeStatus"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="card hidden" id="encodeResult">
+      <h2>Stego output ready</h2>
+      <div id="encodeResultBody"></div>
+    </div>
+
+    <div class="toolbar-center">
+      <button class="btn danger" id="resetEncode" type="button">🔄 Reset encode form</button>
+    </div>
+  </section>
+
+  <!-- ============ DECODE ============ -->
+  <section class="tab-panel" id="panel-decode">
+    <div class="grid">
+
+      <div class="card">
+        <h2><span class="num">1</span> Stego input</h2>
+        <div class="dropzone" id="stegoDrop">
+          <div class="dz-icon">🔍</div>
+          <p><strong>Drop the ZIP or all chunk PNGs</strong></p>
+          <p class="hint">Accepts: one ZIP bundle, or every PNG chunk</p>
+        </div>
+        <input type="file" id="stegoInput" accept=".zip,application/zip,image/png,image/*" multiple hidden />
+        <ul class="file-list" id="stegoFileList"></ul>
+      </div>
+
+      <div class="card">
+        <h2><span class="num">2</span> Extract</h2>
+        <h3>Password</h3>
+        <div class="field">
+          <input type="password" id="decodePassword" placeholder="Password (if encrypted) — press Enter to extract" autocomplete="off" />
+          <button class="eye" id="toggleDecodePw" type="button" title="Show/hide">👁</button>
+        </div>
+
+        <button class="btn primary block" id="decodeBtn" disabled type="button">🔓 Extract &amp; reassemble</button>
+        <div class="status" id="decodeStatus"></div>
+
+        <div id="decodeResult" class="hidden" style="margin-top:20px">
+          <h3>Extracted content</h3>
+          <div class="out-box" id="decodeOutput"></div>
+          <div class="result-actions">
+            <button class="btn small hidden" id="copyOutput" type="button">📋 Copy text</button>
+            <button class="btn small hidden" id="downloadPayload" type="button">⬇ Download original file</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="toolbar-center">
+      <button class="btn danger" id="resetDecode" type="button">🔄 Reset decode form</button>
+    </div>
+  </section>
+
+  <!-- ============ GUIDE ============ -->
+  <section class="tab-panel" id="panel-guide">
+    <div class="guide">
+      <div class="card">
+        <h2>How StegoWeb works</h2>
+        <p>Steganography hides data <em>inside</em> another medium. StegoWeb uses <strong>LSB (Least Significant Bit) substitution</strong>: the last bit of every RGB channel carries one bit of your secret. That changes each channel by ±1 out of 255 — invisible to the eye.</p>
+      </div>
+      <div class="card">
+        <h2>Encoding pipeline</h2>
+        <ol>
+          <li>Your cover image is decoded into raw RGBA pixels on a canvas.</li>
+          <li>Your secret is packaged: text is UTF-8 encoded; files are stored with filename + raw bytes.</li>
+          <li>If you supply a password, the entire payload is encrypted as one unit with AES-256-GCM.</li>
+          <li>The ciphertext is <strong>split into N chunks</strong> if it exceeds the per-image capacity.</li>
+          <li>Each chunk gets a header with index, total count, original size, and filename.</li>
+          <li>Each chunk is embedded in its own upscaled copy of the cover, exported as a lossless PNG.</li>
+          <li>Multi-chunk output is packed into one ZIP (with a manifest) for a single download.</li>
+        </ol>
+      </div>
+      <div class="card">
+        <h2>Decoding &amp; validation</h2>
+        <p>The decoder reads the <strong>embedded index</strong> from each PNG, never the filename. On decode it:</p>
+        <ul>
+          <li>Silently drops duplicate chunks (same embedded index).</li>
+          <li><strong>Aborts with an alert</strong> if any chunk is missing — no partial decode is attempted.</li>
+          <li>Sorts by index and concatenates.</li>
+          <li>Decrypts (if applicable) and verifies the final size.</li>
+        </ul>
+        <div class="note">⚠️ All chunks must be present to decode. AES-256-GCM authenticates the entire stream at once, so a missing chunk makes decryption mathematically impossible.</div>
+      </div>
+      <div class="card">
+        <h2>Privacy</h2>
+        <p>Zero uploads. No backend. No analytics. All cryptography uses the browser's native Web Crypto API.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    StegoWeb · runs entirely in your browser · use responsibly
+  </footer>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================
+   Constants
+   ========================================================= */
+const MAGIC          = new Uint8Array([0x53,0x54,0x47,0x57]);
+const VERSION        = 2;
+const PBKDF2_ITER    = 200000;
+const SALT_LEN       = 16;
+const IV_LEN         = 12;
+const GCM_TAG_LEN    = 16;
+const FLAG_ENCRYPTED = 0x01;
+const FLAG_FILE      = 0x02;
+
+const H_MAGIC   = 0, H_VERSION = 4, H_FLAGS = 5;
+const H_CHUNK_I = 6, H_CHUNK_N = 8, H_ORIG_SZ = 10;
+const H_DATA_LN = 18, H_NAME_LN = 22, H_NAME = 24;
+const HEADER_MIN = 24;
+
+const MAX_CANVAS_DIM    = 16384;
+const MAX_CANVAS_PIXELS = 50 * 1024 * 1024;
+
+/* =========================================================
+   Helpers
+   ========================================================= */
+const $ = (id) => document.getElementById(id);
+
+function fmtBytes(n){
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n/1024).toFixed(1) + " KB";
+  if (n < 1073741824) return (n/1048576).toFixed(2) + " MB";
+  return (n/1073741824).toFixed(2) + " GB";
+}
+
+function setStatus(el, msg, type){
+  if (!el) return;
+  el.className = "status";
+  if (!msg) return;
+  el.textContent = msg;
+  el.classList.add("show", type || "info");
+}
+
+function capacityBytes(w, h){ return Math.floor(w*h*3/8); }
+function computeRequiredPixels(b){ return Math.ceil(b*8/3); }
+
+/* =========================================================
+   Download
+   ========================================================= */
+async function saveBlob(blob, filename){
+  if (!blob) return { ok:false };
+  if (typeof window.showSaveFilePicker === "function"){
+    try {
+      const h = await window.showSaveFilePicker({ suggestedName: filename });
+      const w = await h.createWritable();
+      await w.write(blob);
+      await w.close();
+      return { ok:true, method:"fs" };
+    } catch(err){
+      if (err && err.name === "AbortError") return { ok:false, cancelled:true };
+    }
+  }
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.rel = "noopener";
+    a.style.position = "fixed"; a.style.left = "-9999px"; a.style.top = "0";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      try { document.body.removeChild(a); } catch(e){}
+      try { URL.revokeObjectURL(url); } catch(e){}
+    }, 15000);
+    return { ok:true, method:"anchor" };
+  } catch(err){ console.warn(err); }
+  try {
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, "_blank");
+    if (win) return { ok:true, method:"tab" };
+  } catch(err){ console.warn(err); }
+  return { ok:false };
+}
+
+/* =========================================================
+   Image utilities
+   ========================================================= */
+function fileToImage(file){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not decode image.")); };
+    img.src = url;
+  });
+}
+
+function blobToImage(blob){
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Could not decode image blob.")); };
+    img.src = url;
+  });
+}
+
+function rasterize(img, w, h){
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(img, 0, 0, w, h);
+  return ctx.getImageData(0, 0, w, h);
+}
+
+function imageDataToBlob(imageData){
+  const c = document.createElement("canvas");
+  c.width = imageData.width; c.height = imageData.height;
+  c.getContext("2d").putImageData(imageData, 0, 0);
+  return new Promise((resolve) => c.toBlob(resolve, "image/png"));
+}
+
+/* =========================================================
+   Auto-fit canvas sizing
+   ========================================================= */
+function computeAutoFit(origW, origH, neededPixels){
+  let w = origW, h = origH;
+
+  if (w * h > MAX_CANVAS_PIXELS){
+    const k = Math.sqrt(MAX_CANVAS_PIXELS / (w*h));
+    w = Math.floor(w*k); h = Math.floor(h*k);
+  }
+  if (w > MAX_CANVAS_DIM){ const k = MAX_CANVAS_DIM / w; w = MAX_CANVAS_DIM; h = Math.floor(h*k); }
+  if (h > MAX_CANVAS_DIM){ const k = MAX_CANVAS_DIM / h; h = MAX_CANVAS_DIM; w = Math.floor(w*k); }
+
+  let scaled = (w !== origW || h !== origH);
+
+  if (w * h < neededPixels){
+    const k = Math.sqrt(neededPixels / (w*h));
+    let nw = Math.ceil(w*k), nh = Math.ceil(h*k);
+
+    if (nw > MAX_CANVAS_DIM){ const k2 = MAX_CANVAS_DIM/nw; nw = MAX_CANVAS_DIM; nh = Math.ceil(nh*k2); }
+    if (nh > MAX_CANVAS_DIM){ const k2 = MAX_CANVAS_DIM/nh; nh = MAX_CANVAS_DIM; nw = Math.ceil(nw*k2); }
+    if (nw * nh > MAX_CANVAS_PIXELS){
+      const k2 = Math.sqrt(MAX_CANVAS_PIXELS / (nw*nh));
+      nw = Math.floor(nw*k2); nh = Math.floor(nh*k2);
+    }
+    let guard = 0;
+    while (nw*nh < neededPixels && nw < MAX_CANVAS_DIM && nh < MAX_CANVAS_DIM &&
+           nw*nh < MAX_CANVAS_PIXELS && guard < 100000){
+      if (nw <= nh) nw++; else nh++; guard++;
+    }
+    w = nw; h = nh; scaled = true;
+  }
+
+  return { width: w, height: h, scaled, fits: w*h >= neededPixels };
+}
+
+/* =========================================================
+   Chunk planning
+   ========================================================= */
+function planChunks(payloadLen, filenameLen, encrypted){
+  const headerSize = HEADER_MIN + filenameLen + (encrypted ? SALT_LEN + IV_LEN : 0);
+  const maxPerChunk = Math.floor(MAX_CANVAS_PIXELS * 3 / 8) - headerSize;
+
+  if (payloadLen <= maxPerChunk){
+    return { count: 1, chunkDataSize: payloadLen, headerSize, maxPerChunk };
+  }
+  const count = Math.ceil(payloadLen / maxPerChunk);
+  const chunkDataSize = Math.ceil(payloadLen / count);
+  return { count, chunkDataSize, headerSize, maxPerChunk };
+}
+
+/* =========================================================
+   Crypto
+   ========================================================= */
+async function deriveKey(password, salt){
+  const base = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(password),
+    { name:"PBKDF2" }, false, ["deriveKey"]
+  );
+  return crypto.subtle.deriveKey(
+    { name:"PBKDF2", salt, iterations:PBKDF2_ITER, hash:"SHA-256" },
+    base, { name:"AES-GCM", length:256 }, false, ["encrypt","decrypt"]
+  );
+}
+
+async function encryptBytes(plain, password){
+  const salt = crypto.getRandomValues(new Uint8Array(SALT_LEN));
+  const iv   = crypto.getRandomValues(new Uint8Array(IV_LEN));
+  const key  = await deriveKey(password, salt);
+  const buf  = await crypto.subtle.encrypt({ name:"AES-GCM", iv }, key, plain);
+  return { ciphertext: new Uint8Array(buf), salt, iv };
+}
+
+async function decryptBytes(cipher, password, salt, iv){
+  const key = await deriveKey(password, salt);
+  const buf = await crypto.subtle.decrypt({ name:"AES-GCM", iv }, key, cipher);
+  return new Uint8Array(buf);
+}
+
+/* =========================================================
+   Chunk payload format
+   ========================================================= */
+function buildChunkPayload(data, meta){
+  const { chunkIndex, totalChunks, originalSize, filename, encrypted, isFile, salt, iv } = meta;
+  const nameBytes = new TextEncoder().encode(filename || "");
+  const headerSize = HEADER_MIN + nameBytes.length + (encrypted ? SALT_LEN + IV_LEN : 0);
+  const out = new Uint8Array(headerSize + data.length);
+  const view = new DataView(out.buffer);
+
+  out.set(MAGIC, H_MAGIC);
+  out[H_VERSION] = VERSION;
+  out[H_FLAGS] = (encrypted ? FLAG_ENCRYPTED : 0) | (isFile ? FLAG_FILE : 0);
+  view.setUint16(H_CHUNK_I, chunkIndex, false);
+  view.setUint16(H_CHUNK_N, totalChunks, false);
+  view.setBigUint64(H_ORIG_SZ, BigInt(originalSize), false);
+  view.setUint32(H_DATA_LN, data.length, false);
+  view.setUint16(H_NAME_LN, nameBytes.length, false);
+  out.set(nameBytes, H_NAME);
+
+  let off = H_NAME + nameBytes.length;
+  if (encrypted){ out.set(salt, off); off += SALT_LEN; out.set(iv, off); off += IV_LEN; }
+  out.set(data, off);
+  return out;
+}
+
+function parseChunkPayload(bytes){
+  if (bytes.length < HEADER_MIN) throw new Error("Image too small for StegoWeb payload.");
+  for (let i = 0; i < 4; i++) if (bytes[i] !== MAGIC[i]) throw new Error("No StegoWeb data found in this image.");
+  if (bytes[H_VERSION] !== VERSION) throw new Error("Unsupported payload version " + bytes[H_VERSION]);
+
+  const flags = bytes[H_FLAGS];
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const chunkIndex   = view.getUint16(H_CHUNK_I, false);
+  const totalChunks  = view.getUint16(H_CHUNK_N, false);
+  const originalSize = Number(view.getBigUint64(H_ORIG_SZ, false));
+  const chunkDataLen = view.getUint32(H_DATA_LN, false);
+  const nameLen      = view.getUint16(H_NAME_LN, false);
+
+  const encrypted = (flags & FLAG_ENCRYPTED) !== 0;
+  const isFile    = (flags & FLAG_FILE) !== 0;
+
+  if (H_NAME + nameLen > bytes.length) throw new Error("Malformed header.");
+  const filename = new TextDecoder().decode(bytes.slice(H_NAME, H_NAME + nameLen));
+
+  let off = H_NAME + nameLen;
+  let salt = null, iv = null;
+  if (encrypted){
+    if (off + SALT_LEN + IV_LEN > bytes.length) throw new Error("Malformed encrypted header.");
+    salt = bytes.slice(off, off + SALT_LEN); off += SALT_LEN;
+    iv   = bytes.slice(off, off + IV_LEN);   off += IV_LEN;
+  }
+  if (off + chunkDataLen > bytes.length) throw new Error("Truncated chunk.");
+  const data = bytes.slice(off, off + chunkDataLen);
+
+  return { chunkIndex, totalChunks, originalSize, filename, encrypted, isFile, salt, iv, data };
+}
+
+/* =========================================================
+   LSB
+   ========================================================= */
+function embedBytes(imageData, payload){
+  const d = imageData.data;
+  const totalPixels = d.length / 4;
+  const neededBits = payload.length * 8;
+  if (neededBits > totalPixels * 3) throw new Error("Payload does not fit canvas.");
+
+  let bitPos = 0;
+  for (let p = 0; p < totalPixels && bitPos < neededBits; p++){
+    const base = p * 4;
+    for (let c = 0; c < 3 && bitPos < neededBits; c++){
+      const byteIdx = bitPos >> 3;
+      const bit = (payload[byteIdx] >> (7 - (bitPos & 7))) & 1;
+      d[base + c] = (d[base + c] & 0xFE) | bit;
+      bitPos++;
+    }
+  }
+  return imageData;
+}
+
+function extractAllBytes(imageData){
+  const d = imageData.data;
+  const totalPixels = d.length / 4;
+  const capBytes = Math.floor(totalPixels * 3 / 8);
+  const out = new Uint8Array(capBytes);
+  let bitPos = 0;
+  for (let p = 0; p < totalPixels; p++){
+    const base = p * 4;
+    for (let c = 0; c < 3; c++){
+      const bi = bitPos >> 3;
+      if (bi >= capBytes) return out;
+      out[bi] |= (d[base + c] & 1) << (7 - (bitPos & 7));
+      bitPos++;
+    }
+  }
+  return out;
+}
+
+/* =========================================================
+   CRC32 + ZIP (stored mode)
+   ========================================================= */
+const CRC_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++){
+    let c = i;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    t[i] = c >>> 0;
+  }
+  return t;
+})();
+
+function crc32(bytes){
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function writeZip(files){
+  const enc = new TextEncoder();
+  const parts = [], central = [];
+  let offset = 0;
+
+  for (const f of files){
+    const nameBytes = enc.encode(f.name);
+    const data = f.data;
+    const crc = crc32(data);
+
+    const local = new Uint8Array(30 + nameBytes.length);
+    const lv = new DataView(local.buffer);
+    lv.setUint32(0, 0x04034b50, true);
+    lv.setUint16(4, 20, true);
+    lv.setUint16(6, 0x0800, true);
+    lv.setUint16(8, 0, true);
+    lv.setUint16(10, 0, true);
+    lv.setUint16(12, 0x21, true);
+    lv.setUint32(14, crc, true);
+    lv.setUint32(18, data.length, true);
+    lv.setUint32(22, data.length, true);
+    lv.setUint16(26, nameBytes.length, true);
+    lv.setUint16(28, 0, true);
+    local.set(nameBytes, 30);
+
+    parts.push(local, data);
+    central.push({ nameBytes, crc, size: data.length, offset });
+    offset += local.length + data.length;
+  }
+
+  const cdStart = offset;
+  let cdSize = 0;
+
+  for (const e of central){
+    const cd = new Uint8Array(46 + e.nameBytes.length);
+    const cv = new DataView(cd.buffer);
+    cv.setUint32(0, 0x02014b50, true);
+    cv.setUint16(4, 20, true);
+    cv.setUint16(6, 20, true);
+    cv.setUint16(8, 0x0800, true);
+    cv.setUint16(10, 0, true);
+    cv.setUint16(12, 0, true);
+    cv.setUint16(14, 0x21, true);
+    cv.setUint32(16, e.crc, true);
+    cv.setUint32(20, e.size, true);
+    cv.setUint32(24, e.size, true);
+    cv.setUint16(28, e.nameBytes.length, true);
+    cv.setUint16(30, 0, true);
+    cv.setUint16(32, 0, true);
+    cv.setUint16(34, 0, true);
+    cv.setUint16(36, 0, true);
+    cv.setUint32(38, 0, true);
+    cv.setUint32(42, e.offset, true);
+    cd.set(e.nameBytes, 46);
+
+    parts.push(cd);
+    cdSize += cd.length;
+  }
+
+  const eocd = new Uint8Array(22);
+  const ev = new DataView(eocd.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(4, 0, true);
+  ev.setUint16(6, 0, true);
+  ev.setUint16(8, central.length, true);
+  ev.setUint16(10, central.length, true);
+  ev.setUint32(12, cdSize, true);
+  ev.setUint32(16, cdStart, true);
+  ev.setUint16(20, 0, true);
+  parts.push(eocd);
+
+  return new Blob(parts, { type: "application/zip" });
+}
+
+function readZip(bytes){
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+
+  let eocd = -1;
+  const scanStart = Math.max(0, bytes.length - 65557);
+  for (let i = bytes.length - 22; i >= scanStart; i--){
+    if (view.getUint32(i, true) === 0x06054b50){ eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("Not a valid ZIP file.");
+
+  const total = view.getUint16(eocd + 10, true);
+  let cdOffset = view.getUint32(eocd + 16, true);
+  const files = [];
+  const dec = new TextDecoder();
+
+  for (let i = 0; i < total; i++){
+    if (view.getUint32(cdOffset, true) !== 0x02014b50) throw new Error("Bad ZIP CD entry.");
+    const method = view.getUint16(cdOffset + 10, true);
+    const csize  = view.getUint32(cdOffset + 20, true);
+    const nlen   = view.getUint16(cdOffset + 28, true);
+    const elen   = view.getUint16(cdOffset + 30, true);
+    const clen   = view.getUint16(cdOffset + 32, true);
+    const loff   = view.getUint32(cdOffset + 42, true);
+    const name   = dec.decode(bytes.slice(cdOffset + 46, cdOffset + 46 + nlen));
+
+    if (method !== 0) throw new Error("ZIP entries must be stored (uncompressed).");
+
+    const lNlen = view.getUint16(loff + 26, true);
+    const lElen = view.getUint16(loff + 28, true);
+    const dataStart = loff + 30 + lNlen + lElen;
+    const data = bytes.slice(dataStart, dataStart + csize);
+    files.push({ name, data });
+    cdOffset += 46 + nlen + elen + clen;
+  }
+  return files;
+}
+
+/* =========================================================
+   Tab navigation
+   ========================================================= */
+document.querySelectorAll("nav.tabs button").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("nav.tabs button").forEach((b) => b.classList.remove("active"));
+    document.querySelectorAll(".tab-panel").forEach((p) => p.classList.remove("active"));
+    btn.classList.add("active");
+    $("panel-" + btn.dataset.tab).classList.add("active");
+  });
+});
+
+/* =========================================================
+   Password toggles + Enter-key bindings
+   ========================================================= */
+function bindEye(btnId, inputId){
+  const b = $(btnId), i = $(inputId);
+  if (!b || !i) return;
+  b.addEventListener("click", () => {
+    const isPw = i.type === "password";
+    i.type = isPw ? "text" : "password";
+    b.textContent = isPw ? "🙈" : "👁";
+  });
+}
+bindEye("toggleEncodePw", "encodePassword");
+bindEye("toggleEncodePwConfirm", "encodePasswordConfirm");
+bindEye("toggleDecodePw", "decodePassword");
+
+function bindEnterToButton(inputId, buttonId){
+  const input = $(inputId);
+  const button = $(buttonId);
+  if (!input || !button) return;
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter"){
+      e.preventDefault();
+      if (!button.disabled) button.click();
+    }
+  });
+}
+bindEnterToButton("encodePassword", "encodeBtn");
+bindEnterToButton("encodePasswordConfirm", "encodeBtn");
+bindEnterToButton("decodePassword", "decodeBtn");
+
+/* =========================================================
+   Password confirmation logic (encode page)
+   ========================================================= */
+function passwordsMatch(){
+  const pw1 = $("encodePassword").value;
+  const pw2 = $("encodePasswordConfirm").value;
+  return pw1 === pw2;
+}
+
+function updatePasswordConfirmVisibility(){
+  const pw1 = $("encodePassword").value;
+  const wrap = $("encodePasswordConfirmWrap");
+  if (pw1.length > 0){
+    wrap.classList.remove("hidden");
+  } else {
+    wrap.classList.add("hidden");
+    $("encodePasswordConfirm").value = "";
+    $("encodePasswordConfirm").type = "password";
+    $("toggleEncodePwConfirm").textContent = "👁";
+  }
+}
+
+function updatePasswordMatchHint(){
+  const hint = $("encodePasswordMatchHint");
+  const pw1 = $("encodePassword").value;
+  const pw2 = $("encodePasswordConfirm").value;
+
+  hint.classList.remove("match-ok", "match-err");
+
+  if (pw1.length === 0){
+    hint.textContent = "";
+    return;
+  }
+  if (pw2.length === 0){
+    hint.textContent = "Re-enter the password to confirm.";
+    return;
+  }
+  if (pw1 === pw2){
+    hint.textContent = "✔ Passwords match";
+    hint.classList.add("match-ok");
+  } else {
+    hint.textContent = "❌ Passwords do not match";
+    hint.classList.add("match-err");
+  }
+}
+
+/* =========================================================
+   State
+   ========================================================= */
+const state = {
+  cover: null,
+  coverPreviewUrl: null,
+  mode: "text",
+  secretFile: null,
+  stegoFiles: [],
+  payloadBlob: null,
+  payloadFilename: "payload.bin",
+  lastOutputText: null,
+};
+
+/* =========================================================
+   ENCODE — cover loading
+   ========================================================= */
+async function loadCover(file){
+  try {
+    setStatus($("encodeStatus"), "", "");
+    const img = await fileToImage(file);
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+
+    if (state.coverPreviewUrl){
+      try { URL.revokeObjectURL(state.coverPreviewUrl); } catch(e){}
+    }
+    const previewUrl = URL.createObjectURL(file);
+    state.coverPreviewUrl = previewUrl;
+
+    state.cover = { img, nativeW: w, nativeH: h, file };
+
+    const previewImg = $("coverPreview");
+    previewImg.onerror = () => {
+      const c = document.createElement("canvas");
+      c.width = Math.min(200, w);
+      c.height = Math.round(c.width * (h / w));
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      previewImg.src = c.toDataURL("image/png");
+    };
+    previewImg.src = previewUrl;
+
+    $("coverPreviewWrap").classList.remove("hidden");
+    $("coverMeta").innerHTML =
+      "<b>" + file.name + "</b>" +
+      w + " × " + h + " px · native capacity " + fmtBytes(capacityBytes(w, h));
+
+    $("coverDrop").classList.add("hidden");
+    $("encodeResult").classList.add("hidden");
+    updateCapacity();
+  } catch(err){
+    console.error(err);
+    setStatus($("encodeStatus"), err.message, "err");
+  }
+}
+
+$("clearCover").addEventListener("click", () => {
+  if (state.coverPreviewUrl){
+    try { URL.revokeObjectURL(state.coverPreviewUrl); } catch(e){}
+    state.coverPreviewUrl = null;
+  }
+  state.cover = null;
+  $("coverPreview").removeAttribute("src");
+  $("coverPreviewWrap").classList.add("hidden");
+  $("coverDrop").classList.remove("hidden");
+  $("encodeResult").classList.add("hidden");
+  updateCapacity();
+  setStatus($("encodeStatus"), "", "");
+});
+
+(function wireCoverDrop(){
+  const zone = $("coverDrop"), input = $("coverInput");
+  zone.addEventListener("click", () => input.click());
+  input.addEventListener("change", () => {
+    if (input.files && input.files[0]) loadCover(input.files[0]);
+    input.value = "";
+  });
+  ["dragenter","dragover"].forEach((ev) => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); e.stopPropagation(); zone.classList.add("drag");
+  }));
+  ["dragleave","drop"].forEach((ev) => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); e.stopPropagation(); zone.classList.remove("drag");
+  }));
+  zone.addEventListener("drop", (e) => {
+    const dt = e.dataTransfer;
+    if (dt && dt.files && dt.files[0]) loadCover(dt.files[0]);
+  });
+})();
+
+document.addEventListener("paste", (e) => {
+  if (!$("panel-encode").classList.contains("active")) return;
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (const it of items){
+    if (it.type && it.type.startsWith("image/")){
+      const f = it.getAsFile();
+      if (f){ loadCover(f); setStatus($("encodeStatus"), "Cover loaded from clipboard.", "info"); }
+      break;
+    }
+  }
+});
+
+/* =========================================================
+   ENCODE — mode switching
+   ========================================================= */
+$("modeSwitch").addEventListener("click", (e) => {
+  const btn = e.target.closest(".seg");
+  if (!btn) return;
+  document.querySelectorAll("#modeSwitch .seg").forEach((b) => b.classList.remove("active"));
+  btn.classList.add("active");
+  state.mode = btn.dataset.mode;
+  $("textMode").classList.toggle("hidden", state.mode !== "text");
+  $("fileMode").classList.toggle("hidden", state.mode !== "file");
+  updateCapacity();
+});
+
+$("secretFile").addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  state.secretFile = f || null;
+  $("secretFileName").textContent = f
+    ? "📎 " + f.name + " (" + fmtBytes(f.size) + ")"
+    : "📎 Choose any file to hide…";
+  updateCapacity();
+});
+
+$("secretText").addEventListener("input", updateCapacity);
+
+$("encodePassword").addEventListener("input", () => {
+  updatePasswordConfirmVisibility();
+  updatePasswordMatchHint();
+  updateCapacity();
+});
+
+$("encodePasswordConfirm").addEventListener("input", () => {
+  updatePasswordMatchHint();
+  updateCapacity();
+});
+
+/* =========================================================
+   ENCODE — capacity meter
+   ========================================================= */
+function estimatePlainSize(){
+  if (state.mode === "text"){
+    const t = $("secretText").value;
+    return t ? new TextEncoder().encode(t).length : 0;
+  }
+  return state.secretFile ? state.secretFile.size : 0;
+}
+
+function updateCapacity(){
+  const fill = $("capFill"), text = $("capText"), btn = $("encodeBtn");
+
+  if (!state.cover){
+    fill.style.width = "0%"; fill.className = "cap-fill";
+    text.textContent = "Select a cover image to see capacity.";
+    btn.disabled = true; return;
+  }
+
+  const nativeCap = capacityBytes(state.cover.nativeW, state.cover.nativeH);
+  const maxChunkCap = Math.floor(MAX_CANVAS_PIXELS * 3 / 8);
+
+  const plain = estimatePlainSize();
+  const encrypted = $("encodePassword").value.length > 0;
+
+  if (encrypted && !passwordsMatch()){
+    fill.style.width = "0%"; fill.className = "cap-fill";
+    text.textContent = "❌ Passwords do not match — fix confirmation to continue.";
+    btn.disabled = true; return;
+  }
+
+  const overhead = HEADER_MIN + (encrypted ? SALT_LEN + IV_LEN + GCM_TAG_LEN : 0);
+  const needed = plain > 0 ? plain + overhead : 0;
+
+  if (needed === 0){
+    fill.style.width = "0%"; fill.className = "cap-fill";
+    text.textContent = "Available: " + fmtBytes(nativeCap) +
+      " per image (up to " + fmtBytes(maxChunkCap) + ") — enter a secret.";
+    btn.disabled = true; return;
+  }
+
+  const nameLen = state.mode === "file" && state.secretFile ? state.secretFile.name.length : 0;
+  const plan = planChunks(plain, nameLen, encrypted);
+
+  if (plan.count === 1 && needed <= nativeCap){
+    const pct = (needed / nativeCap) * 100;
+    fill.style.width = pct + "%";
+    fill.className = "cap-fill" + (pct > 80 ? " warn" : "");
+    text.textContent = "Using " + fmtBytes(needed) + " of " + fmtBytes(nativeCap) +
+      " (" + pct.toFixed(1) + "%)" + (encrypted ? " · encrypted" : "");
+  } else if (plan.count === 1){
+    const fit = computeAutoFit(state.cover.nativeW, state.cover.nativeH, computeRequiredPixels(needed));
+    fill.style.width = "100%"; fill.className = "cap-fill warn";
+    text.textContent = "🔼 Upscale cover to " + fit.width + " × " + fit.height +
+      " to fit " + fmtBytes(needed) + (encrypted ? " · encrypted" : "");
+  } else {
+    const perChunk = Math.ceil(needed / plan.count);
+    fill.style.width = "100%"; fill.className = "cap-fill warn";
+    text.textContent = "🧩 Split into " + plan.count + " images (~" +
+      fmtBytes(perChunk) + " each)" + (encrypted ? " · encrypted" : "");
+  }
+  btn.disabled = false;
+}
+
+/* =========================================================
+   ENCODE — main action
+   ========================================================= */
+$("encodeBtn").addEventListener("click", async () => {
+  const status = $("encodeStatus");
+  const btn = $("encodeBtn");
+
+  if (!state.cover){ setStatus(status, "Choose a cover image first.", "err"); return; }
+
+  const password = $("encodePassword").value;
+  const encrypted = password.length > 0;
+  if (encrypted && password !== $("encodePasswordConfirm").value){
+    setStatus(status, "Passwords do not match. Please re-enter the confirmation password.", "err");
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus(status, "Working…", "info");
+
+  try {
+    let plainBytes, isFile = false, filename = "";
+    if (state.mode === "text"){
+      const t = $("secretText").value;
+      if (!t) throw new Error("Please type a message to hide.");
+      plainBytes = new TextEncoder().encode(t);
+    } else {
+      if (!state.secretFile) throw new Error("Please choose a file to hide.");
+      const buf = await state.secretFile.arrayBuffer();
+      plainBytes = new Uint8Array(buf);
+      isFile = true;
+      filename = state.secretFile.name;
+    }
+
+    let dataBytes = plainBytes, salt = null, iv = null;
+
+    if (encrypted){
+      setStatus(status, "Encrypting…", "info");
+      const r = await encryptBytes(plainBytes, password);
+      dataBytes = r.ciphertext;
+      salt = r.salt;
+      iv = r.iv;
+    }
+
+    const plan = planChunks(dataBytes.length, filename.length, encrypted);
+    const payloads = [];
+    for (let i = 0; i < plan.count; i++){
+      const start = i * plan.chunkDataSize;
+      const end = Math.min(start + plan.chunkDataSize, dataBytes.length);
+      const chunkData = dataBytes.slice(start, end);
+      payloads.push(buildChunkPayload(chunkData, {
+        chunkIndex: i,
+        totalChunks: plan.count,
+        originalSize: plainBytes.length,
+        filename, encrypted, isFile, salt, iv
+      }));
+    }
+
+    const chunkBlobs = [];
+    const chunkInfo = [];
+    for (let i = 0; i < payloads.length; i++){
+      setStatus(status, "Encoding image " + (i+1) + " of " + payloads.length + "…", "info");
+      const p = payloads[i];
+      const fit = computeAutoFit(state.cover.nativeW, state.cover.nativeH, computeRequiredPixels(p.length));
+      if (!fit.fits) throw new Error("Chunk " + (i+1) + " does not fit at max canvas size.");
+      const work = rasterize(state.cover.img, fit.width, fit.height);
+      embedBytes(work, p);
+      const blob = await imageDataToBlob(work);
+      if (!blob) throw new Error("Failed to export chunk " + (i+1) + ".");
+      chunkBlobs.push(blob);
+      chunkInfo.push({ width: fit.width, height: fit.height, payloadBytes: p.length });
+    }
+
+    if (chunkBlobs.length === 1){
+      const fname = "stego-" + Date.now() + ".png";
+      renderSingleResult(chunkBlobs[0], fname, plainBytes.length, chunkInfo[0], isFile, encrypted);
+      setStatus(status, "Success! Stego image ready.", "ok");
+    } else {
+      setStatus(status, "Packaging ZIP…", "info");
+      const entries = [];
+      for (let i = 0; i < chunkBlobs.length; i++){
+        const buf = new Uint8Array(await chunkBlobs[i].arrayBuffer());
+        entries.push({ name: "chunk-" + String(i).padStart(3, "0") + ".png", data: buf });
+      }
+      const manifest = JSON.stringify({
+        stegoweb: VERSION,
+        totalChunks: chunkBlobs.length,
+        originalName: filename || "message.txt",
+        originalSize: plainBytes.length,
+        encrypted, isFile,
+        createdAt: new Date().toISOString()
+      }, null, 2);
+      entries.push({ name: "manifest.json", data: new TextEncoder().encode(manifest) });
+
+      const zipBlob = writeZip(entries);
+      const fname = "stegoweb-bundle-" + Date.now() + ".zip";
+      renderZipResult(chunkBlobs, zipBlob, fname, plainBytes.length, chunkInfo, isFile, encrypted);
+      setStatus(status, "Success! " + chunkBlobs.length + " chunks packed into one ZIP.", "ok");
+    }
+
+    $("encodeResult").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch(err){
+    console.error(err);
+    setStatus(status, err.message || String(err), "err");
+  } finally {
+    updateCapacity();
+  }
+});
+
+/* =========================================================
+   Render encode result — single PNG
+   ========================================================= */
+function renderSingleResult(blob, filename, plainSize, info, isFile, encrypted){
+  const body = $("encodeResultBody");
+  body.innerHTML = "";
+
+  const url = URL.createObjectURL(blob);
+  const grid = document.createElement("div");
+  grid.className = "result-grid";
+  grid.innerHTML =
+    '<img src="' + url + '" alt="Stego preview" />' +
+    '<div class="actions">' +
+      '<p class="ok-text">✔ Hidden ' + fmtBytes(plainSize) +
+        (isFile ? " of file data" : " of text") +
+        (encrypted ? " — encrypted." : " — unencrypted.") + '</p>' +
+      '<p class="hint">Cover rendered at ' + info.width + '×' + info.height + ' px.</p>' +
+      '<button class="btn primary" id="dl1" type="button">⬇ Download stego PNG</button>' +
+      '<p class="hint">If the button does nothing, right-click / long-press the preview → “Save image as…”.</p>' +
+      '<p class="hint">Save as PNG only. JPG re-compression destroys the payload.</p>' +
+    '</div>';
+  body.appendChild(grid);
+
+  $("encodeResult").classList.remove("hidden");
+
+  $("dl1").addEventListener("click", async () => {
+    const btn = $("dl1");
+    btn.disabled = true;
+    setStatus($("encodeStatus"), "Saving…", "info");
+    try {
+      const r = await saveBlob(blob, filename);
+      if (r.cancelled) setStatus($("encodeStatus"), "Save cancelled.", "info");
+      else if (r.ok) setStatus($("encodeStatus"), "✔ Saved: " + filename, "ok");
+      else setStatus($("encodeStatus"), "Download blocked. Right-click the preview image to save manually.", "err");
+    } catch(err){
+      console.error(err);
+      setStatus($("encodeStatus"), "Download error: " + (err.message || err), "err");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+function renderZipResult(chunkBlobs, zipBlob, filename, plainSize, chunkInfo, isFile, encrypted){
+  const body = $("encodeResultBody");
+  body.innerHTML = "";
+
+  const grid = document.createElement("div");
+  grid.className = "chunk-grid";
+  chunkBlobs.forEach((b, i) => {
+    const url = URL.createObjectURL(b);
+    const div = document.createElement("div");
+    div.className = "chunk";
+    div.innerHTML = '<img src="' + url + '" alt="Chunk ' + i + '" /><div class="label">#' + (i+1) + '</div>';
+    grid.appendChild(div);
+    setTimeout(() => { try { URL.revokeObjectURL(url); } catch(e){} }, 120000);
+  });
+
+  const summary = document.createElement("div");
+  summary.innerHTML =
+    '<p class="ok-text" style="margin-top:16px">✔ Hidden ' + fmtBytes(plainSize) +
+      (isFile ? " of file data" : " of text") +
+      (encrypted ? " — encrypted." : " — unencrypted.") + '</p>' +
+    '<p class="hint">Split across ' + chunkBlobs.length + ' images. Download the ZIP, keep every PNG intact.</p>' +
+    '<button class="btn primary" id="dlZip" type="button" style="margin-top:10px">⬇ Download ZIP bundle (' +
+      chunkBlobs.length + ' chunks + manifest)</button>' +
+    '<p class="hint">To decode later, upload the ZIP as-is, or upload every PNG chunk together.</p>';
+
+  body.appendChild(grid);
+  body.appendChild(summary);
+  $("encodeResult").classList.remove("hidden");
+
+  $("dlZip").addEventListener("click", async () => {
+    const btn = $("dlZip");
+    btn.disabled = true;
+    setStatus($("encodeStatus"), "Saving…", "info");
+    try {
+      const r = await saveBlob(zipBlob, filename);
+      if (r.cancelled) setStatus($("encodeStatus"), "Save cancelled.", "info");
+      else if (r.ok) setStatus($("encodeStatus"), "✔ Saved: " + filename, "ok");
+      else setStatus($("encodeStatus"), "Download blocked by browser.", "err");
+    } catch(err){
+      console.error(err);
+      setStatus($("encodeStatus"), "Download error: " + (err.message || err), "err");
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
+
+/* =========================================================
+   ENCODE — reset
+   ========================================================= */
+$("resetEncode").addEventListener("click", () => {
+  if (state.coverPreviewUrl){
+    try { URL.revokeObjectURL(state.coverPreviewUrl); } catch(e){}
+    state.coverPreviewUrl = null;
+  }
+  state.cover = null;
+  $("coverPreview").removeAttribute("src");
+  $("coverPreviewWrap").classList.add("hidden");
+  $("coverDrop").classList.remove("hidden");
+
+  state.mode = "text";
+  document.querySelectorAll("#modeSwitch .seg").forEach((b) => {
+    b.classList.toggle("active", b.dataset.mode === "text");
+  });
+  $("textMode").classList.remove("hidden");
+  $("fileMode").classList.add("hidden");
+  $("secretText").value = "";
+  $("secretFile").value = "";
+  state.secretFile = null;
+  $("secretFileName").textContent = "📎 Choose any file to hide…";
+
+  $("encodePassword").value = "";
+  $("encodePassword").type = "password";
+  $("toggleEncodePw").textContent = "👁";
+
+  $("encodePasswordConfirm").value = "";
+  $("encodePasswordConfirm").type = "password";
+  $("toggleEncodePwConfirm").textContent = "👁";
+  $("encodePasswordConfirmWrap").classList.add("hidden");
+
+  $("encodePasswordMatchHint").textContent = "";
+  $("encodePasswordMatchHint").classList.remove("match-ok", "match-err");
+
+  $("encodeResult").classList.add("hidden");
+  $("encodeResultBody").innerHTML = "";
+
+  updateCapacity();
+  setStatus($("encodeStatus"), "Form reset.", "info");
+  setTimeout(() => setStatus($("encodeStatus"), "", ""), 1500);
+});
+
+/* =========================================================
+   DECODE — file list with per-chunk delete buttons
+   ========================================================= */
+function renderStegoFileList(){
+  const list = $("stegoFileList");
+  list.innerHTML = "";
+
+  state.stegoFiles.forEach((f, i) => {
+    const li = document.createElement("li");
+
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "fname";
+    nameSpan.textContent = f.name;
+
+    const sizeSpan = document.createElement("span");
+    sizeSpan.className = "fsize";
+    sizeSpan.textContent = fmtBytes(f.size);
+
+    const del = document.createElement("button");
+    del.type = "button";
+    del.className = "chunk-del";
+    del.title = "Remove this chunk from the input list";
+    del.setAttribute("aria-label", "Remove " + f.name);
+    del.textContent = "✕";
+    del.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.stegoFiles.splice(i, 1);
+      renderStegoFileList();
+      setStatus($("decodeStatus"), "Removed: " + f.name, "info");
+    });
+
+    li.appendChild(nameSpan);
+    li.appendChild(sizeSpan);
+    li.appendChild(del);
+    list.appendChild(li);
+  });
+
+  $("decodeBtn").disabled = state.stegoFiles.length === 0;
+}
+
+async function addStegoFiles(files){
+  for (const f of files){
+    state.stegoFiles.push({ name: f.name, size: f.size, raw: f });
+  }
+  renderStegoFileList();
+}
+
+(function wireStegoDrop(){
+  const zone = $("stegoDrop"), input = $("stegoInput");
+  zone.addEventListener("click", () => input.click());
+  input.addEventListener("change", () => {
+    if (input.files && input.files.length) addStegoFiles(Array.from(input.files));
+    input.value = "";
+  });
+  ["dragenter","dragover"].forEach((ev) => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); e.stopPropagation(); zone.classList.add("drag");
+  }));
+  ["dragleave","drop"].forEach((ev) => zone.addEventListener(ev, (e) => {
+    e.preventDefault(); e.stopPropagation(); zone.classList.remove("drag");
+  }));
+  zone.addEventListener("drop", (e) => {
+    const dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length) addStegoFiles(Array.from(dt.files));
+  });
+})();
+
+/* =========================================================
+   DECODE — main action (all-or-nothing)
+   ========================================================= */
+$("decodeBtn").addEventListener("click", async () => {
+  const status = $("decodeStatus");
+  const btn = $("decodeBtn");
+
+  if (state.stegoFiles.length === 0){
+    setStatus(status, "Add a ZIP or the chunk PNGs first.", "err");
+    return;
+  }
+
+  btn.disabled = true;
+  setStatus(status, "Reading inputs…", "info");
+
+  try {
+    const pngs = [];
+    for (const entry of state.stegoFiles){
+      const f = entry.raw;
+      const lower = f.name.toLowerCase();
+
+      if (lower.endsWith(".zip") || f.type === "application/zip"){
+        setStatus(status, "Unpacking " + f.name + "…", "info");
+        const buf = new Uint8Array(await f.arrayBuffer());
+        const entries = readZip(buf);
+        for (const e of entries){
+          if (e.name.toLowerCase().endsWith(".png")){
+            pngs.push({ name: e.name, blob: new Blob([e.data], { type: "image/png" }) });
+          }
+        }
+      } else {
+        pngs.push({ name: f.name, blob: f });
+      }
+    }
+
+    if (pngs.length === 0) throw new Error("No PNG chunks found in the input.");
+    setStatus(status, "Found " + pngs.length + " image(s). Extracting…", "info");
+
+    const parsedChunks = [];
+    for (let i = 0; i < pngs.length; i++){
+      setStatus(status, "Extracting chunk " + (i+1) + " of " + pngs.length + "…", "info");
+      const img = await blobToImage(pngs[i].blob);
+      const imageData = rasterize(img, img.naturalWidth || img.width, img.naturalHeight || img.height);
+      const allBytes = extractAllBytes(imageData);
+      try {
+        parsedChunks.push(parseChunkPayload(allBytes));
+      } catch(err){
+        console.warn("Skipping " + pngs[i].name + ": " + err.message);
+      }
+    }
+
+    if (parsedChunks.length === 0) throw new Error("No StegoWeb chunks were found in the input.");
+
+    const byIndex = new Map();
+    let dupCount = 0;
+    for (const c of parsedChunks){
+      if (byIndex.has(c.chunkIndex)) { dupCount++; continue; }
+      byIndex.set(c.chunkIndex, c);
+    }
+    const uniqueChunks = Array.from(byIndex.values()).sort((a, b) => a.chunkIndex - b.chunkIndex);
+
+    const total = uniqueChunks[0].totalChunks;
+    const missing = [];
+    for (let i = 0; i < total; i++){
+      if (!byIndex.has(i)) missing.push(i);
+    }
+
+    if (missing.length > 0){
+      const msg =
+        "⚠  Cannot decode — chunks are missing.\n\n" +
+        "Present : " + uniqueChunks.length + " of " + total + "\n" +
+        "Missing : " + missing.join(", ") +
+        (dupCount > 0 ? "\nDuplicates ignored: " + dupCount : "") +
+        "\n\nAll chunks are required for a valid decode. " +
+        "Add the missing file(s) and try again.";
+
+      alert(msg);
+
+      setStatus(status,
+        "Decode aborted — " + missing.length + " chunk(s) missing: " +
+        missing.join(", "), "err");
+
+      $("decodeResult").classList.add("hidden");
+      btn.disabled = false;
+      return;
+    }
+
+    if (dupCount > 0){
+      setStatus(status, "All " + total + " chunks present (" + dupCount +
+        " duplicate(s) ignored). Reassembling…", "info");
+    } else {
+      setStatus(status, "All " + total + " chunks present. Reassembling…", "info");
+    }
+
+    let totalLen = 0;
+    for (const c of uniqueChunks) totalLen += c.data.length;
+    const joined = new Uint8Array(totalLen);
+    let off = 0;
+    for (const c of uniqueChunks){ joined.set(c.data, off); off += c.data.length; }
+
+    const meta = uniqueChunks[0];
+    let plainBytes = joined;
+
+    if (meta.encrypted){
+      const pw = $("decodePassword").value;
+      if (!pw) throw new Error("This payload is encrypted. Please enter the password.");
+      setStatus(status, "Decrypting…", "info");
+      try {
+        plainBytes = await decryptBytes(joined, pw, meta.salt, meta.iv);
+      } catch(e){
+        throw new Error("Decryption failed. Wrong password or modified image.");
+      }
+    }
+
+    if (plainBytes.length !== meta.originalSize){
+      throw new Error("Reassembled size mismatch: expected " + meta.originalSize +
+        ", got " + plainBytes.length + ".");
+    }
+
+    const out = $("decodeOutput");
+    const copyBtn = $("copyOutput");
+    const dlBtn = $("downloadPayload");
+    copyBtn.classList.add("hidden");
+    dlBtn.classList.add("hidden");
+    state.lastOutputText = null;
+    state.payloadBlob = null;
+
+    if (meta.isFile){
+      const blob = new Blob([plainBytes], { type: "application/octet-stream" });
+      state.payloadBlob = blob;
+      state.payloadFilename = meta.filename || "payload.bin";
+
+      out.textContent =
+        "📎 File recovered\n\n" +
+        "Name: " + state.payloadFilename + "\n" +
+        "Size: " + fmtBytes(plainBytes.length) + "\n" +
+        "Chunks: " + total + "\n" +
+        "Encrypted: " + (meta.encrypted ? "yes" : "no") + "\n" +
+        "Status: reassembly complete ✔\n";
+
+      dlBtn.classList.remove("hidden");
+    } else {
+      const text = new TextDecoder().decode(plainBytes);
+      out.textContent = text;
+      state.lastOutputText = text;
+      copyBtn.classList.remove("hidden");
+    }
+
+    $("decodeResult").classList.remove("hidden");
+    setStatus(status, "✔ Extracted " + fmtBytes(plainBytes.length) +
+      (meta.encrypted ? " (decrypted)" : "") +
+      (dupCount > 0 ? " · " + dupCount + " duplicate(s) ignored" : "") + ".", "ok");
+
+  } catch(err){
+    console.error(err);
+    setStatus(status, err.message || String(err), "err");
+    $("decodeResult").classList.add("hidden");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* =========================================================
+   DECODE — reset
+   ========================================================= */
+$("resetDecode").addEventListener("click", () => {
+  state.stegoFiles = [];
+  renderStegoFileList();
+  $("decodePassword").value = "";
+  $("decodePassword").type = "password";
+  $("toggleDecodePw").textContent = "👁";
+  $("decodeResult").classList.add("hidden");
+  $("decodeOutput").textContent = "";
+  $("copyOutput").classList.add("hidden");
+  $("downloadPayload").classList.add("hidden");
+  state.payloadBlob = null;
+  state.payloadFilename = "payload.bin";
+  state.lastOutputText = null;
+  setStatus($("decodeStatus"), "Form reset.", "info");
+  setTimeout(() => setStatus($("decodeStatus"), "", ""), 1500);
+});
+
+/* =========================================================
+   DECODE — download extracted file
+   ========================================================= */
+$("downloadPayload").addEventListener("click", async () => {
+  const btn = $("downloadPayload");
+  if (!state.payloadBlob){ setStatus($("decodeStatus"), "No file to download.", "err"); return; }
+
+  btn.disabled = true;
+  setStatus($("decodeStatus"), "Saving…", "info");
+
+  try {
+    const r = await saveBlob(state.payloadBlob, state.payloadFilename);
+    if (r.cancelled) setStatus($("decodeStatus"), "Save cancelled.", "info");
+    else if (r.ok) setStatus($("decodeStatus"), "✔ Saved: " + state.payloadFilename, "ok");
+    else setStatus($("decodeStatus"), "Download blocked by browser.", "err");
+  } catch(err){
+    console.error(err);
+    setStatus($("decodeStatus"), "Download error: " + (err.message || err), "err");
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* =========================================================
+   DECODE — copy text
+   ========================================================= */
+$("copyOutput").addEventListener("click", async () => {
+  if (!state.lastOutputText) return;
+  try {
+    await navigator.clipboard.writeText(state.lastOutputText);
+    setStatus($("decodeStatus"), "Text copied to clipboard.", "ok");
+  } catch(e){
+    setStatus($("decodeStatus"), "Clipboard blocked by browser.", "err");
+  }
+});
+
+/* =========================================================
+   Environment check
+   ========================================================= */
+(function(){
+  if (!(window.crypto && window.crypto.subtle)){
+    setStatus($("encodeStatus"),
+      "Web Crypto is unavailable. Serve this page over HTTPS or localhost.", "err");
+    setStatus($("decodeStatus"),
+      "Web Crypto is unavailable. Serve this page over HTTPS or localhost.", "err");
+  }
+})();
+</script>
+</body>
+</html>
